@@ -1,0 +1,2 @@
+[console_scripts]
+jobtracker = jobtracker.__main__:cli

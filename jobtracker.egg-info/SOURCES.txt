@@ -1,0 +1,12 @@
+LICENSE
+README.md
+pyproject.toml
+setup.py
+jobtracker/__init__.py
+jobtracker/__main__.py
+jobtracker.egg-info/PKG-INFO
+jobtracker.egg-info/SOURCES.txt
+jobtracker.egg-info/dependency_links.txt
+jobtracker.egg-info/entry_points.txt
+jobtracker.egg-info/requires.txt
+jobtracker.egg-info/top_level.txt
