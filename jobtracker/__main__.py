@@ -5,6 +5,13 @@ import sqlite3
 import os
 from datetime import datetime
 from InquirerPy import inquirer
+from rich.console import Console
+from rich.text import Text
+from rich.style import Style
+import json
+
+console = Console()
+SEGMENT_WIDTH = 16 
 
 DB_PATH = os.path.expanduser("~/.jobtracker/jobtracker.db")
 STATUS_CHOICES = [
@@ -13,6 +20,12 @@ STATUS_CHOICES = [
     "Team Match", "Offer", "Rejected"
 ]
 
+STAGE_MAP = {
+    'a': ["Applied"],
+    'o': ["Received OA", "Finished OA"],
+    'v': ["Scheduled VO", "Finished VO", "Team Match"],
+    'f': ["Offer", "Rejected"]
+}
 
 
 def get_connection():
@@ -37,7 +50,8 @@ def init_db():
             applied_date TEXT,
             important_date TEXT,
             updated_date TEXT,
-            round_count INTEGER
+            round_count INTEGER,
+            status_history TEXT
         )
     ''')
     conn.commit()
@@ -59,17 +73,18 @@ def add():
     weblink = click.prompt("Web Link", default="", show_default=False)
     
     important_date = None
-    interview_round = 0
+    interview_round = 1
 
     status = "Applied"
     now = datetime.now().isoformat()
+    status_history = json.dumps([status])
 
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('''
-        INSERT INTO applications (company, title, location, status, notes, weblink, applied_date, important_date, updated_date, round_count)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (company, title, location, status, notes, weblink, now, important_date, now, interview_round))
+        INSERT INTO applications (company, title, location, status, notes, weblink, applied_date, important_date, updated_date, round_count, status_history)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (company, title, location, status, notes, weblink, now, important_date, now, interview_round, status_history))
     conn.commit()
     click.echo(f"Applied for {title} at {company}")
 
@@ -86,7 +101,7 @@ def update_by_id(id):
     """Update application status automatically and optionally update notes."""
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute('SELECT company, status, round_count FROM applications WHERE id=?', (id,))
+    cursor.execute('SELECT company, status, round_count, status_history FROM applications WHERE id=?', (id,))
     row = cursor.fetchone()
     if not row:
         click.echo(f"Application not found with ID {id}.")
@@ -97,6 +112,7 @@ def update_by_id(id):
     round_count = row['round_count']
     now = datetime.now().isoformat()
     new_status = current_status
+    history = json.loads(row['status_history']) if row['status_history'] else [current_status]
 
     if current_status == "Applied":
         new_status = "Received OA"
@@ -126,9 +142,12 @@ def update_by_id(id):
     elif current_status in ["Offer", "Rejected"]:
         click.echo("Application is already complete. No further updates.")
         return
+    
+    history.append(new_status)
     notes = click.prompt("Any notes to be added", default="", show_default=False)
+    
     # Update the status and optionally notes
-    cursor.execute('UPDATE applications SET status=?, notes=?, updated_date=?, round_count=? WHERE id=?', (new_status, notes, now, round_count, id))
+    cursor.execute('UPDATE applications SET status=?, notes=?, updated_date=?, round_count=?, status_history=? WHERE id=?', (new_status, notes, now, round_count, json.dumps(history), id))
     conn.commit()
     click.echo(f"Your Application at {company} has been updated to status '{new_status}'.")
 
@@ -154,6 +173,62 @@ def update_by_search():
     ).execute()
     update_by_id(selected_id)
 
+def render_progress_bar(completed_statuses):
+    current_status = completed_statuses[-1] if completed_statuses else ""
+    is_finalized = current_status in ["Offer", "Rejected"]
+    
+    bar_color = {
+        True: "green" if current_status == "Offer" else "red"
+    }.get(is_finalized, "dark_slate_gray1")
+
+    marker_color = {
+        True: "green" if current_status == "Offer" else "red"
+    }.get(is_finalized, "blue")
+
+    # Label row
+    label_row = ""
+    for stage in completed_statuses:
+        pad = SEGMENT_WIDTH - len(stage)
+        label_row += stage + (" " * pad)
+
+    # Progress line
+    progress_line = Text()
+    progress_line.append("+", style=marker_color)
+
+    for _ in range(1, len(completed_statuses)):
+        progress_line.append("===============", style=bar_color)
+        progress_line.append("+", style=marker_color)
+
+    return label_row.strip(), progress_line
+
+@cli.command()
+@click.option('--stage', '-s', type=click.Choice(['a', 'o', 'v', 'f']), default=None)
+def list(stage):
+    """Show all applications or filter by stage."""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    if stage:
+        filters = STAGE_MAP[stage]
+        placeholders = ','.join('?' * len(filters))
+        cursor.execute(f"SELECT * FROM applications WHERE status IN ({placeholders})", filters)
+    else:
+        cursor.execute("SELECT * FROM applications")
+
+    rows = cursor.fetchall()
+    if not rows:
+        console.print("No applications found.", style="bold red")
+        return
+
+    for row in rows:
+        company_line = f"{row['company']} {row['title']} {row['location']} {row['applied_date'][:10]}"
+        console.print(company_line, style="bold white")
+
+        completed_statuses = json.loads(row['status_history']) if row['status_history'] else [row['status']]
+        label_row, progress_line = render_progress_bar(completed_statuses)
+        console.print(label_row)
+        console.print(progress_line)
+
 
 @cli.command()
 @click.option('--id', '-i', type=int, required=True)
@@ -169,7 +244,7 @@ def delete(id):
 
     cursor.execute('DELETE FROM applications WHERE id=?', (id,))
     conn.commit()
-    click.echo(f"🗑️ Deleted application ID {id}.")
+    click.echo(f"Deleted application ID {id}.")
 
 # @cli.command()
 # @click.option('--status', type=click.Choice(STATUS_CHOICES), default=None)
