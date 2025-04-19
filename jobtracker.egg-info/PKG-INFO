@@ -1,6 +1,7 @@
 Metadata-Version: 2.1
 Name: jobtracker
-Version: 0.1.0
+Version: 0.1
 License-File: LICENSE
 Requires-Dist: click
+Requires-Dist: rich
 Requires-Dist: InquirerPy

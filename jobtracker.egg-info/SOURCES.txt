@@ -10,3 +10,13 @@ jobtracker.egg-info/dependency_links.txt
 jobtracker.egg-info/entry_points.txt
 jobtracker.egg-info/requires.txt
 jobtracker.egg-info/top_level.txt
+jobtracker/cli/__init__.py
+jobtracker/cli/add.py
+jobtracker/cli/delete.py
+jobtracker/cli/list_apps.py
+jobtracker/cli/update.py
+jobtracker/db/__init__.py
+jobtracker/db/queries.py
+jobtracker/db/schema.py
+jobtracker/utils/__init__.py
+jobtracker/utils/render.py
