@@ -13,8 +13,19 @@ STAGE_MAP = {
     'f': ["Offer", "Rejected"]
 }
 
+ORDER_MAP = {
+    "Applied": 1,
+    "Received OA": 2,
+    "Finished OA": 3,
+    "Scheduled VO": 4,
+    "Finished VO": 5,
+    "Team Match": 6,
+    "Offer": 100,
+    "Rejected": 101
+}
+
 @click.command() 
-@click.option('--stage', '-s', type=click.Choice(['a', 'o', 'v', 'f']), default=None)
+@click.option('--stage', '-st', type=click.Choice(['a', 'o', 'v', 'f']), default=None)
 def list_apps(stage):
     """Show all applications or filter by stage."""
     conn = get_connection()
@@ -31,6 +42,14 @@ def list_apps(stage):
     if not rows:
         console.print("No applications found.", style="bold red")
         return
+    
+    def sort_key(row):
+        status = row['status']
+        base_order = ORDER_MAP.get(status, 0)
+        round_count = row['round_count']
+        return round_count * base_order
+    
+    rows.sort(key=sort_key)
 
     for row in rows:
         company_line = f"{row['company']} {row['title']} {row['location']} {row['applied_date'][:10]}"
