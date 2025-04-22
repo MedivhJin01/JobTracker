@@ -4,6 +4,7 @@ from datetime import datetime
 from InquirerPy import inquirer
 from jobtracker.db.queries import get_connection
 from rich.console import Console
+from jobtracker.utils.fuzzy import fuzzy_select_app
 
 console = Console()
 SEGMENT_WIDTH = 15
@@ -78,17 +79,5 @@ def update_by_search():
     apps = cursor.fetchall()
     if not apps:
         return
-    choices = [
-        {
-            "name": f"{str(row['id'])} {row['company'].ljust(SEGMENT_WIDTH)} | {row['title'].ljust(SEGMENT_WIDTH)} | {row['status'].ljust(SEGMENT_WIDTH)} | {row['applied_date'][:10]}",
-            "value": row['id']
-        }
-        for row in apps
-    ]
-    selected_id = inquirer.fuzzy(
-        message="Search by company name:",
-        choices = choices,
-        multiselect=False,
-        validate=lambda x: x is not None,
-    ).execute()
+    selected_id = fuzzy_select_app(apps, SEGMENT_WIDTH)
     update_by_id(selected_id)

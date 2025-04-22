@@ -4,8 +4,10 @@ from datetime import datetime
 from InquirerPy import inquirer
 from jobtracker.db.queries import get_connection
 from rich.console import Console
+from jobtracker.utils.fuzzy import fuzzy_select_app
 
 console = Console()
+SEGMENT_WIDTH = 16
 
 @click.command() 
 @click.option('--id', '-i', type=int, required=False)
@@ -13,7 +15,7 @@ def reject(id):
     if id is not None:
         reject_by_id(id)
     else:
-        update_by_search()
+        reject_by_search()
 
 def reject_by_id(id):
     """Update application status automatically and optionally update notes."""
@@ -40,24 +42,12 @@ def reject_by_id(id):
     click.echo(f"Your Application at {company} has been updated to status '{new_status}'.")
 
 
-def update_by_search():
+def reject_by_search():
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('SELECT id, company, title, status, applied_date FROM applications')
     apps = cursor.fetchall()
     if not apps:
         return
-    choices = [
-        {
-            "name": f"[{row['id']}] {row['company']} | {row['title']} | {row['status']} | {row['applied_date']}",
-            "value": row['id']
-        }
-        for row in apps
-    ]
-    selected_id = inquirer.fuzzy(
-        message="Search by company name:",
-        choices = choices,
-        multiselect=False,
-        validate=lambda x: x is not None,
-    ).execute()
+    selected_id = fuzzy_select_app(apps, SEGMENT_WIDTH)
     reject_by_id(selected_id)
