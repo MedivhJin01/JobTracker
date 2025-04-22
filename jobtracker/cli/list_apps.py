@@ -1,10 +1,19 @@
 import click
 import json
+from InquirerPy import inquirer
 from jobtracker.db.queries import get_connection
 from rich.console import Console
 from jobtracker.utils.render import render_progress_bar
 
 console = Console()
+SEGMENT_WIDTH = 15
+FUZZY_SEARCH_SEGEMENT_WIDTH = 7
+
+# fuzzy search
+# -a list all
+# -s stages
+# -c companies
+
 
 STAGE_MAP = {
     'a': ["Applied"],
@@ -25,19 +34,61 @@ ORDER_MAP = {
 }
 
 @click.command() 
-@click.option('--stage', '-st', type=click.Choice(['a', 'o', 'v', 'f']), default=None)
-def list_apps(stage):
+
+@click.option('--all', '-a', is_flag=True, default=None, help="List all applications")
+@click.option('--company', '-c', default=None, help="Filter by company name")
+@click.option('--stage', '-s', type=click.Choice(['a', 'o', 'v', 'f']), default=None)
+def list_apps(all, company, stage):
     """Show all applications or filter by stage."""
     conn = get_connection()
     cursor = conn.cursor()
 
-    if stage:
-        filters = STAGE_MAP[stage]
-        placeholders = ','.join('?' * len(filters))
-        cursor.execute(f"SELECT * FROM applications WHERE status IN ({placeholders})", filters)
-    else:
-        cursor.execute("SELECT * FROM applications")
+    if not any([all, company, stage]):
+        cursor.execute("SELECT company FROM applications GROUP BY company")
+        result = cursor.fetchall()
+        if not result:
+            console.print("No companies found.", style="bold red")
+            return
+        companies = []
+        mapping = {}
 
+        for row in result:
+            company = row['company']
+            cursor.execute("SELECT COUNT(*) FROM applications WHERE company=?", (company,))
+            total_count = cursor.fetchone()[0]
+
+            cursor.execute("SELECT COUNT(*) FROM applications WHERE company=? AND status NOT IN ('Offer', 'Rejected')", (company,))
+            active_count = cursor.fetchone()[0]
+
+            finalized_count = total_count - active_count
+            display = f"{company.ljust(10)} In Progress {str(active_count).ljust(5)} Finalized {str(finalized_count)}"
+
+            companies.append(display)
+            mapping[display] = company
+
+        selected_company = inquirer.fuzzy(
+            message="Search company to list applications",
+            choices=companies
+        ).execute()
+        company = mapping[selected_company]
+    
+    query = "SELECT * FROM applications"
+    conditions = []
+    params = []
+
+    if not all:
+        if company:
+            conditions.append("company LIKE ?")
+            params.append(f"%{company}%")
+        if stage:
+            filters = STAGE_MAP[stage]
+            placeholders = ','.join('?' * len(filters))
+            conditions.append(f"status IN ({placeholders})")
+            params.extend(filters)
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+    
+    cursor.execute(query, params)
     rows = cursor.fetchall()
     if not rows:
         console.print("No applications found.", style="bold red")
@@ -52,7 +103,7 @@ def list_apps(stage):
     rows.sort(key=sort_key)
 
     for row in rows:
-        company_line = f"{row['company']} {row['title']} {row['location']} {row['applied_date'][:10]}"
+        company_line = f"{str(row['id']).ljust(3)} {row['company'].ljust(SEGMENT_WIDTH)} {row['title'].ljust(SEGMENT_WIDTH)} {row['location'].ljust(SEGMENT_WIDTH)} {row['applied_date'][:10]}"
         console.print(company_line, style="bold white")
 
         completed_statuses = json.loads(row['status_history']) if row['status_history'] else [row['status']]

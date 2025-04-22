@@ -1,7 +1,9 @@
-Metadata-Version: 2.1
+Metadata-Version: 2.4
 Name: jobtracker
 Version: 0.1
 License-File: LICENSE
 Requires-Dist: click
 Requires-Dist: rich
 Requires-Dist: InquirerPy
+Dynamic: license-file
+Dynamic: requires-dist

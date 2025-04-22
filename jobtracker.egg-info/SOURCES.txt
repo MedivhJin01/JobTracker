@@ -14,6 +14,7 @@ jobtracker/cli/__init__.py
 jobtracker/cli/add.py
 jobtracker/cli/delete.py
 jobtracker/cli/list_apps.py
+jobtracker/cli/reject.py
 jobtracker/cli/update.py
 jobtracker/db/__init__.py
 jobtracker/db/queries.py

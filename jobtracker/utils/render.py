@@ -15,17 +15,17 @@ def render_progress_bar(completed_statuses):
     }.get(is_finalized, "blue")
 
     # Label row
-    label_row = ""
+    label_row = "    "
     for stage in completed_statuses:
         pad = SEGMENT_WIDTH - len(stage)
         label_row += stage + (" " * pad)
 
     # Progress line
-    progress_line = Text()
+    progress_line = Text("    ")
     progress_line.append("+", style=marker_color)
 
     for _ in range(1, len(completed_statuses)):
         progress_line.append("===============", style=bar_color)
         progress_line.append("+", style=marker_color)
 
-    return label_row.strip(), progress_line
+    return label_row, progress_line

@@ -6,6 +6,7 @@ from jobtracker.db.queries import get_connection
 from rich.console import Console
 
 console = Console()
+SEGMENT_WIDTH = 15
 
 @click.command() 
 @click.option('--id', '-i', type=int, required=False)
@@ -43,8 +44,8 @@ def update_by_id(id):
         round_count = 1
     elif current_status == "Finished VO":
         while True:
-            answer = click.prompt("Are there more interview rounds to come? (y/n)", type=str).strip().lower()
-            if answer == "y":
+            confirm = click.confirm("Are there more interview rounds to come? (y/n)", default=False)
+            if confirm:
                 round_count += 1 
                 new_status = "Scheduled VO"
                 break
@@ -52,13 +53,13 @@ def update_by_id(id):
                 new_status = "Team Match"
                 break
     elif current_status == "Team Match":
-        offer = click.prompt("Did you receive an offer? (y/n)", type=str).strip().lower()
-        if offer == "y":
+        confirm = click.confirm("Did you receive an offer?", default=False)
+        if confirm:
             new_status = "Offer"
         else:
             new_status = "Rejected"
     elif current_status in ["Offer", "Rejected"]:
-        click.echo("Application is already complete. No further updates.")
+        click.echo("Application is already completed. No further updates.")
         return
     
     history.append(new_status)
@@ -79,7 +80,7 @@ def update_by_search():
         return
     choices = [
         {
-            "name": f"[{row['id']}] {row['company']} | {row['title']} | {row['status']} | {row['applied_date']}",
+            "name": f"{str(row['id'])} {row['company'].ljust(SEGMENT_WIDTH)} | {row['title'].ljust(SEGMENT_WIDTH)} | {row['status'].ljust(SEGMENT_WIDTH)} | {row['applied_date'][:10]}",
             "value": row['id']
         }
         for row in apps
